@@ -14,7 +14,12 @@ async def list_investors(repo: InvestorRepoDep) -> list[InvestorRead]:
     return [InvestorRead.model_validate(i) for i in investors]
 
 
-@router.post("", response_model=InvestorRead, status_code=201)
+@router.post(
+    "",
+    response_model=InvestorRead,
+    status_code=201,
+    responses={409: {"description": "An investor with this email already exists"}},
+)
 async def create_investor(data: InvestorCreate, repo: InvestorRepoDep) -> InvestorRead:
     investor = await repo.create(data)
     return InvestorRead.model_validate(investor)

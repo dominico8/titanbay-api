@@ -49,9 +49,7 @@ async def _create_database_if_missing(url: str) -> None:
         database="postgres",
     )
     try:
-        exists = await conn.fetchval(
-            "SELECT 1 FROM pg_database WHERE datname = $1", db_name
-        )
+        exists = await conn.fetchval("SELECT 1 FROM pg_database WHERE datname = $1", db_name)
         if not exists:
             # Identifier cannot be parameterised; db_name is derived from our own config.
             await conn.execute(f'CREATE DATABASE "{db_name}"')

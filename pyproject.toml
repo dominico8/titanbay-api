@@ -39,3 +39,25 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+concurrency = ["thread", "greenlet"]
+omit = [
+    "app/__init__.py",
+    "app/models/__init__.py",
+    "app/schemas/__init__.py",
+    "app/repositories/__init__.py",
+    "app/routers/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+skip_covered = false

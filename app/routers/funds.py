@@ -22,13 +22,21 @@ async def create_fund(data: FundCreate, repo: FundRepoDep) -> FundRead:
     return FundRead.model_validate(fund)
 
 
-@router.put("", response_model=FundRead)
+@router.put(
+    "",
+    response_model=FundRead,
+    responses={404: {"description": "Fund not found"}},
+)
 async def update_fund(data: FundUpdate, repo: FundRepoDep) -> FundRead:
     fund = await repo.update(data)
     return FundRead.model_validate(fund)
 
 
-@router.get("/{id}", response_model=FundRead)
+@router.get(
+    "/{id}",
+    response_model=FundRead,
+    responses={404: {"description": "Fund not found"}},
+)
 async def get_fund(id: UUID, repo: FundRepoDep) -> FundRead:
     fund = await repo.get_by_id(id)
     return FundRead.model_validate(fund)

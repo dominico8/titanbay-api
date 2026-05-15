@@ -10,7 +10,11 @@ from app.schemas.investment import InvestmentCreate, InvestmentRead
 router = APIRouter(prefix="/funds/{fund_id}/investments", tags=["investments"])
 
 
-@router.get("", response_model=list[InvestmentRead])
+@router.get(
+    "",
+    response_model=list[InvestmentRead],
+    responses={404: {"description": "Fund not found"}},
+)
 async def list_investments_for_fund(
     fund_id: UUID,
     repo: InvestmentRepoDep,
@@ -19,7 +23,12 @@ async def list_investments_for_fund(
     return [InvestmentRead.model_validate(inv) for inv in investments]
 
 
-@router.post("", response_model=InvestmentRead, status_code=201)
+@router.post(
+    "",
+    response_model=InvestmentRead,
+    status_code=201,
+    responses={404: {"description": "Fund or investor not found"}},
+)
 async def create_investment(
     fund_id: UUID,
     data: InvestmentCreate,

@@ -5,6 +5,7 @@ Run with: ``uv run python -m scripts.seed`` (or ``make seed``).
 The script uses the same repository classes as the API, so it exercises the
 same code paths. Existing rows (matched on natural keys) are left alone.
 """
+
 from __future__ import annotations
 
 import asyncio
