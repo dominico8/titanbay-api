@@ -1,0 +1,29 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: titanbay
+          POSTGRES_PASSWORD: titanbay
+          POSTGRES_DB: titanbay
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://titanbay:titanbay@localhost:5432/titanbay
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.12
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run alembic upgrade head
+      - run: uv run pytest -v
