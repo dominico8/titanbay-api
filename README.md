@@ -1,5 +1,7 @@
 ## Titanbay Private Markets API
 
+![ci](https://github.com/dominico8/titanbay-api/actions/workflows/ci.yml/badge.svg)
+
 A REST API for managing funds, investors, and investments in a private-markets fund platform. Built with FastAPI and async SQLAlchemy 2.0 on top of PostgreSQL 16 and Alembic, packaged with uv, and shipped via Docker Compose.
 
 ## Quickstart
