@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY . .
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-dev
+    uv sync
 
 # ---------- runtime ----------
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime

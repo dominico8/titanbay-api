@@ -1,13 +1,13 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from alembic import context
+from app import models  # noqa: F401  (ensure models are imported for autogenerate)
 from app.config import get_settings
 from app.database import Base
-from app import models  # noqa: F401  (ensure models are imported for autogenerate)
 
 config = context.config
 
