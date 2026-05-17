@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_valid
 FundStatus = Literal["Fundraising", "Investing", "Closed"]
 
 
-class FundCreate(BaseModel):
+class _FundBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     vintage_year: int = Field(ge=1900, le=2100)
     target_size_usd: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
@@ -24,21 +24,22 @@ class FundCreate(BaseModel):
             raise ValueError("name must not be empty or whitespace-only")
         return stripped
 
+    @field_validator("target_size_usd", mode="before")
+    @classmethod
+    def _reject_string_money(cls, v):
+        if isinstance(v, str):
+            raise ValueError("target_size_usd must be a JSON number, not a string")
+        return v
 
-class FundUpdate(BaseModel):
+
+class FundCreate(_FundBase):
+    model_config = ConfigDict(extra="forbid")
+
+
+class FundUpdate(_FundBase):
+    model_config = ConfigDict(extra="forbid")
+
     id: UUID
-    name: str = Field(min_length=1, max_length=255)
-    vintage_year: int = Field(ge=1900, le=2100)
-    target_size_usd: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
-    status: FundStatus
-
-    @field_validator("name")
-    @classmethod
-    def _name_must_not_be_blank(cls, v: str) -> str:
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("name must not be empty or whitespace-only")
-        return stripped
 
 
 class FundRead(BaseModel):

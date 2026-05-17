@@ -139,6 +139,37 @@ async def test_create_investment_zero_amount_returns_422(client: AsyncClient) ->
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
+async def test_create_investment_string_money_rejected(client: AsyncClient) -> None:
+    fund = await _create_fund(client)
+    investor = await _create_investor(client)
+    response = await client.post(
+        f"/funds/{fund['id']}/investments",
+        json={
+            "investor_id": investor["id"],
+            "amount_usd": "100.00",
+            "investment_date": "2024-03-15",
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_create_investment_rejects_extra_fields(client: AsyncClient) -> None:
+    fund = await _create_fund(client)
+    investor = await _create_investor(client)
+    response = await client.post(
+        f"/funds/{fund['id']}/investments",
+        json={
+            "investor_id": investor["id"],
+            "amount_usd": 100.00,
+            "investment_date": "2024-03-15",
+            "rogue_field": "boom",
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 async def test_list_investments_filters_by_fund(client: AsyncClient) -> None:
     fund_a = await _create_fund(client, name="Fund A")
     fund_b = await _create_fund(client, name="Fund B")

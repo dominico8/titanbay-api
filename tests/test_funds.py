@@ -66,6 +66,27 @@ async def test_create_fund_strips_name_whitespace(client: AsyncClient) -> None:
     assert response.json()["name"] == "Trimmed Fund"
 
 
+async def test_create_fund_string_money_rejected(client: AsyncClient) -> None:
+    response = await client.post(
+        "/funds",
+        json={**VALID_FUND, "target_size_usd": "100.00"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_create_fund_rejects_extra_fields(client: AsyncClient) -> None:
+    response = await client.post(
+        "/funds",
+        json={**VALID_FUND, "unexpected_field": "boom"},
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    msgs = [e["msg"] for e in body["error"]["details"]["errors"]]
+    assert any("extra" in m.lower() or "unexpected" in m.lower() for m in msgs)
+
+
 async def test_create_fund_missing_field_returns_422(client: AsyncClient) -> None:
     payload = {k: v for k, v in VALID_FUND.items() if k != "status"}
     response = await client.post("/funds", json=payload)

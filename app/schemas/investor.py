@@ -10,6 +10,8 @@ InvestorType = Literal["Individual", "Institution", "Family Office"]
 
 
 class InvestorCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(min_length=1, max_length=255)
     investor_type: InvestorType
     email: EmailStr

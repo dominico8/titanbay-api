@@ -14,6 +14,12 @@ docker compose exec api uv run python -m scripts.seed
 
 Then open http://localhost:8000/docs for the interactive Swagger UI. A health probe is at http://localhost:8000/health.
 
+If port 5432 or 8000 is already in use on your machine, override them via environment variables:
+
+```bash
+POSTGRES_HOST_PORT=5433 API_HOST_PORT=8001 docker compose up --build
+```
+
 `GET /health` is a shallow liveness check (process running). `GET /ready` additionally confirms the database is reachable.
 
 ## Local development (without Docker)
@@ -40,7 +46,7 @@ Locally (without Docker), the same command works after `uv sync`.
 
 ## API reference
 
-The full spec lives at `/docs` (Swagger UI) and `/redoc`. Endpoints match the provided specification exactly.
+Endpoints match the provided specification: same paths, methods, field names, and field types, including JSON-number money fields. The interactive documentation at `/docs` (Swagger UI) and `/redoc` is generated from the router definitions.
 
 ```
 GET    /funds
@@ -90,11 +96,11 @@ scripts/seed.py        Idempotent seed data
 
 **FastAPI + async SQLAlchemy 2.0.** Pydantic v2 gives validation and OpenAPI generation for free, and end-to-end async matches a Postgres backend that benefits from connection-level concurrency. SQLAlchemy 2.0's `Mapped` / `mapped_column` style produces cleaner types than the legacy `Column` declarative and integrates well with type checkers.
 
-**Decimal, not float, internally.** All money columns are `NUMERIC(20, 2)` in Postgres and `Decimal` in Python, so arithmetic and storage are exact. JSON responses convert to a bare number at the serialization boundary to match the spec example responses. The conversion is the only place precision loss could occur, and it is one-way (response only) — the source of truth remains Decimal.
+**Decimal in storage, float64 on the wire.** All money fields are `NUMERIC(20, 2)` in Postgres and `Decimal` in Python, so storage and arithmetic are exact. JSON responses convert to a bare number at the serialization boundary; this is float64 on the wire, which is precise to ~15 significant digits — well beyond any value in the spec or any realistic fund size (a `target_size_usd` up to ~9 quadrillion USD round-trips exactly). Inputs are required to be JSON numbers (string inputs rejected with 422 via a Pydantic before-validator). If the API ever needed exact end-to-end Decimal preservation for sub-cent precision on trillion-dollar values, the serialization boundary is the only place the conversion happens and could be swapped (e.g. simplejson with `use_decimal=True`), but that is a contrived requirement for this domain.
 
 **Postgres ENUMs, not just Pydantic Literals.** `status` and `investor_type` are enforced as native Postgres enum types in addition to Pydantic `Literal` types. A direct INSERT bypassing the app would still fail on an invalid value. Defence in depth: Pydantic catches it at the request boundary, Postgres catches it again at the storage boundary.
 
-**Repository pattern between routers and ORM.** Routers translate HTTP↔Pydantic↔repository and do nothing else. Business rules (existence checks before insert, `IntegrityError` → `ConflictError` translation, commit-and-refresh, NOT_FOUND messages identifying which entity is missing) live in repositories. Routers are 3–5 lines per handler and trivially testable; swapping the persistence layer would not touch HTTP code.
+**Repository pattern between routers and ORM.** Routers depend on repositories via FastAPI `Depends`, and translate HTTP ↔ Pydantic ↔ repository calls. Business rules (existence checks before insert, `IntegrityError` → `ConflictError` translation, commit-and-refresh, NOT_FOUND messages identifying which entity is missing) live in repositories. The persistence boundary is small enough that swapping the ORM would require touching the repository implementations but not the router code.
 
 **Server-side UUID generation via `gen_random_uuid()`.** IDs come from Postgres' pgcrypto extension rather than Python's `uuid` module. There is one source of truth for primary keys and any client that bypasses the API still gets correctly-shaped IDs.
 
@@ -117,11 +123,12 @@ scripts/seed.py        Idempotent seed data
 - `vintage_year` is bounded to `[1900, 2100]`.
 - All amounts (`target_size_usd`, `amount_usd`) must be strictly positive.
 - `investment_date` is not constrained relative to fund lifecycle — the spec is silent and there is no `Fund.created_at`-vs-`investment_date` check.
-- Money fields are stored and computed as `Decimal` (NUMERIC(20,2)); JSON responses convert to a bare number at the serialization boundary to match the spec.
+- Money fields are stored and computed as `Decimal` (NUMERIC(20,2)); request inputs must be JSON numbers (string inputs rejected); responses serialize as float64 JSON numbers (~15-digit precision, more than the domain needs).
 - `PUT /funds` is a full replacement of mutable fields (`name`, `vintage_year`, `target_size_usd`, `status`); `id` and `created_at` are not modified.
+- Request bodies must contain exactly the documented fields; unknown fields are rejected with 422 (Pydantic `extra="forbid"`).
 
 ## Working with AI tools
 
 I used Claude Code via the VS Code extension. The work was broken into six scoped prompts: scaffold (FastAPI + Docker + Alembic skeleton), models + initial migration, schemas + repositories + error envelope, routers + middleware, integration tests, and finally seed + README + polish. After each prompt I ran the acceptance criteria myself (the docker-compose stack, ruff, pytest, the curl checks) and committed atomically before moving on, so the git history reads as one logical step per commit.
 
-Decisions I made independently of the model: the tech stack (FastAPI + SQLAlchemy 2.0 + uv + Alembic vs alternatives like Django or Litestar), the repository-pattern boundary as the place to commit transactions, the error-envelope shape, the choice to enforce enums at the DB layer rather than only at the Pydantic layer, money-as-strings on the wire, and the savepoint-rollback test isolation strategy. The model also caught two real issues mid-flow worth noting: a ruff `B008` violation on `Depends()` defaults (fixed by switching to `Annotated` dep aliases), and a `Decimal`-in-validation-errors JSON serialization bug that surfaced only when triggering a 422 with a `Decimal` field (fixed via `jsonable_encoder`).
+Decisions I made independently of the model: the tech stack (FastAPI + SQLAlchemy 2.0 + uv + Alembic vs alternatives like Django or Litestar), the repository-pattern boundary as the place to commit transactions, the error-envelope shape, the choice to enforce enums at the DB layer rather than only at the Pydantic layer, the Decimal-in-storage / float64-on-wire money model with string-input rejection, and the savepoint-rollback test isolation strategy. The model also caught two real issues mid-flow worth noting: a ruff `B008` violation on `Depends()` defaults (fixed by switching to `Annotated` dep aliases), and a `Decimal`-in-validation-errors JSON serialization bug that surfaced only when triggering a 422 with a `Decimal` field (fixed via `jsonable_encoder`).

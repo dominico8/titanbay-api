@@ -79,6 +79,15 @@ async def test_create_investor_email_case_insensitive_uniqueness(client: AsyncCl
     assert response.json()["error"]["code"] == "CONFLICT"
 
 
+async def test_create_investor_rejects_extra_fields(client: AsyncClient) -> None:
+    response = await client.post(
+        "/investors",
+        json={**VALID_INVESTOR, "rogue_field": "boom"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 async def test_list_investors(client: AsyncClient) -> None:
     a = (
         await client.post(

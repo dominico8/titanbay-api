@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from app.routers.dependencies import FundRepoDep
+from app.schemas.error import ErrorResponse
 from app.schemas.fund import FundCreate, FundRead, FundUpdate
 
 router = APIRouter(prefix="/funds", tags=["funds"])
@@ -16,7 +17,12 @@ async def list_funds(repo: FundRepoDep) -> list[FundRead]:
     return [FundRead.model_validate(f) for f in funds]
 
 
-@router.post("", response_model=FundRead, status_code=201)
+@router.post(
+    "",
+    response_model=FundRead,
+    status_code=201,
+    responses={422: {"model": ErrorResponse, "description": "Validation error"}},
+)
 async def create_fund(data: FundCreate, repo: FundRepoDep) -> FundRead:
     fund = await repo.create(data)
     return FundRead.model_validate(fund)
@@ -25,7 +31,10 @@ async def create_fund(data: FundCreate, repo: FundRepoDep) -> FundRead:
 @router.put(
     "",
     response_model=FundRead,
-    responses={404: {"description": "Fund not found"}},
+    responses={
+        404: {"model": ErrorResponse, "description": "Fund not found"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+    },
 )
 async def update_fund(data: FundUpdate, repo: FundRepoDep) -> FundRead:
     fund = await repo.update(data)
@@ -35,7 +44,10 @@ async def update_fund(data: FundUpdate, repo: FundRepoDep) -> FundRead:
 @router.get(
     "/{id}",
     response_model=FundRead,
-    responses={404: {"description": "Fund not found"}},
+    responses={
+        404: {"model": ErrorResponse, "description": "Fund not found"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+    },
 )
 async def get_fund(id: UUID, repo: FundRepoDep) -> FundRead:
     fund = await repo.get_by_id(id)
