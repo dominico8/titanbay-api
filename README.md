@@ -40,7 +40,7 @@ uv run python -m scripts.seed
 docker compose exec api uv run pytest -v
 ```
 
-Integration tests cover all 8 endpoints, validation rules, error envelopes, name normalization, the request-ID middleware, and HTTP-level error envelopes for unknown routes and methods. They finish in ~1 second against a separate `titanbay_test` database, each test isolated by a SAVEPOINT that is rolled back on teardown — the real Alembic migration is exercised on every run, not a `metadata.create_all` shortcut.
+Integration tests cover all 8 endpoints, validation rules, error envelopes, name normalization, the request-ID middleware, and HTTP-level error envelopes for unknown routes and methods. They finish in ~1 second against a separate `titanbay_test` database, each test isolated by a SAVEPOINT that is rolled back on teardown. The real Alembic migration is exercised on every run, not a `metadata.create_all` shortcut.
 
 Locally (without Docker), the same command works after `uv sync`.
 
@@ -96,7 +96,7 @@ scripts/seed.py        Idempotent seed data
 
 **FastAPI + async SQLAlchemy 2.0.** Pydantic v2 gives validation and OpenAPI generation for free, and end-to-end async matches a Postgres backend that benefits from connection-level concurrency. SQLAlchemy 2.0's `Mapped` / `mapped_column` style produces cleaner types than the legacy `Column` declarative and integrates well with type checkers.
 
-**Decimal in storage, float64 on the wire.** All money fields are `NUMERIC(20, 2)` in Postgres and `Decimal` in Python, so storage and arithmetic are exact. JSON responses convert to a bare number at the serialization boundary; this is float64 on the wire, which is precise to ~15 significant digits — well beyond any value in the spec or any realistic fund size (a `target_size_usd` up to ~9 quadrillion USD round-trips exactly). Inputs are required to be JSON numbers (string inputs rejected with 422 via a Pydantic before-validator). If exact end-to-end Decimal preservation is later required, the serialization boundary is the only conversion point and can be swapped (e.g. simplejson with `use_decimal=True`).
+**Decimal in storage, float64 on the wire.** All money fields are `NUMERIC(20, 2)` in Postgres and `Decimal` in Python, so storage and arithmetic are exact. JSON responses convert to a bare number at the serialization boundary; this is float64 on the wire, which is precise to ~15 significant digits, well beyond any value in the spec or any realistic fund size (a `target_size_usd` up to ~9 quadrillion USD round-trips exactly). Inputs are required to be JSON numbers (string inputs rejected with 422 via a Pydantic before-validator). If exact end-to-end Decimal preservation is later required, the serialization boundary is the only conversion point and can be swapped (e.g. simplejson with `use_decimal=True`).
 
 **Postgres ENUMs, not just Pydantic Literals.** `status` and `investor_type` are enforced as native Postgres enum types in addition to Pydantic `Literal` types. A direct INSERT bypassing the app would still fail on an invalid value. Defence in depth: Pydantic catches it at the request boundary, Postgres catches it again at the storage boundary.
 
@@ -104,13 +104,13 @@ scripts/seed.py        Idempotent seed data
 
 **Server-side UUID generation via `gen_random_uuid()`.** IDs come from Postgres' pgcrypto extension rather than Python's `uuid` module. There is one source of truth for primary keys and any client that bypasses the API still gets correctly-shaped IDs.
 
-**Email uniqueness on investors.** Not specified in the API doc, but enforced via a UNIQUE constraint — a duplicate POST returns 409 rather than silently creating a second investor. Called out here because it's an assumption beyond the spec.
+**Email uniqueness on investors.** Not specified in the API doc, but enforced via a UNIQUE constraint, a duplicate POST returns 409 rather than silently creating a second investor. Called out here because it's an assumption beyond the spec.
 
-**PUT /funds with id in the body.** Unusual REST — typically the id lives in the path — but the spec is unambiguous, so the implementation follows the spec rather than convention. Noted so reviewers know it's deliberate.
+**PUT /funds with id in the body.** Unusual REST, typically the id lives in the path, but the spec is unambiguous, so the implementation follows the spec rather than convention. Noted so reviewers know it's deliberate.
 
 **No DELETE endpoints.** The spec does not include them. Adding speculative endpoints would expand the surface area without an authoritative contract.
 
-**Consistent error envelope.** All errors (validation, not-found, conflict, 500) share `{error: {code, message, details?, request_id}}`. Clients write one error path. The catch-all 500 handler logs the traceback but returns only a generic message — no internal detail leaks to the client.
+**Consistent error envelope.** All errors (validation, not-found, conflict, 500) share `{error: {code, message, details?, request_id}}`. Clients write one error path. The catch-all 500 handler logs the traceback but returns only a generic message, no internal detail leaks to the client.
 
 **Request-ID propagation.** Middleware reads `X-Request-ID` (or generates a UUID), stashes it on `request.state`, echoes it on the response, and the error helper embeds it in the error body. A client trace ID surfaces through logs and error reports without per-endpoint wiring.
 
@@ -122,13 +122,19 @@ scripts/seed.py        Idempotent seed data
 - Investor emails are normalized to lowercase on write; uniqueness is therefore case-insensitive.
 - `vintage_year` is bounded to `[1900, 2100]`.
 - All amounts (`target_size_usd`, `amount_usd`) must be strictly positive.
-- `investment_date` is not constrained relative to fund lifecycle — the spec is silent and there is no `Fund.created_at`-vs-`investment_date` check.
+- `investment_date` is not constrained relative to fund lifecycle, the spec is silent and there is no `Fund.created_at`-vs-`investment_date` check.
 - Money fields are stored and computed as `Decimal` (NUMERIC(20,2)); request inputs must be JSON numbers (string inputs rejected); responses serialize as float64 JSON numbers (~15-digit precision, more than the domain needs).
 - `PUT /funds` is a full replacement of mutable fields (`name`, `vintage_year`, `target_size_usd`, `status`); `id` and `created_at` are not modified.
 - Request bodies must contain exactly the documented fields; unknown fields are rejected with 422 (Pydantic `extra="forbid"`).
 
 ## Working with AI tools
 
-I used Claude Code via the VS Code extension. The work was broken into six scoped prompts: scaffold (FastAPI + Docker + Alembic skeleton), models + initial migration, schemas + repositories + error envelope, routers + middleware, integration tests, and finally seed + README + polish. After each prompt I ran the acceptance criteria myself (the docker-compose stack, ruff, pytest, the curl checks) and committed atomically before moving on, so the git history reads as one logical step per commit.
+I used Claude Code through the VS Code extension as an implementation and review assistant during development. I broke the project into a series of narrowly scoped tasks, setting up the FastAPI/Docker/Alembic skeleton, defining models and migrations, building schemas and repository abstractions, wiring routers and middleware, adding integration tests, and finally polishing documentation and seed data.
 
-Decisions I made independently of the model: the tech stack (FastAPI + SQLAlchemy 2.0 + uv + Alembic vs alternatives like Django or Litestar), the repository-pattern boundary as the place to commit transactions, the error-envelope shape, the choice to enforce enums at the DB layer rather than only at the Pydantic layer, the Decimal-in-storage / float64-on-wire money model with string-input rejection, and the savepoint-rollback test isolation strategy. The model also caught two real issues mid-flow worth noting: a ruff `B008` violation on `Depends()` defaults (fixed by switching to `Annotated` dep aliases), and a `Decimal`-in-validation-errors JSON serialization bug that surfaced only when triggering a 422 with a `Decimal` field (fixed via `jsonable_encoder`).
+After each stage I validated the work myself by running the docker-compose stack, linting with ruff, executing pytest, and manually checking endpoints with curl before committing incrementally. The workflow was intentionally iterative: I refined generated code, adjusted architecture decisions, and corrected issues surfaced during testing and review.
+
+The core architectural decisions were made independently: choosing FastAPI + SQLAlchemy 2.0 + Alembic over alternatives such as Django or Litestar, defining the repository-pattern transaction boundary, designing the error-envelope structure, enforcing enums at the database layer instead of only through Pydantic, using Decimal for storage while exposing float64 over the API with strict string-input rejection, and implementing savepoint-based rollback isolation for tests.
+
+I also ran two rounds of independent hostile review using a different model and triaged the findings myself rather than acting on them wholesale. One instructive case: a review round flagged a theoretical precision-loss risk on the money serialization boundary, which I addressed by adding simplejson and two monkey-patches on FastAPI internals. After implementing it I rolled the change back, float64 covers fund sizes up to ~9 quadrillion USD exactly, and the patches introduced fragile dependencies on framework private APIs that weren't justified by the domain. The commit history shows both directions and the reasoning.
+
+Two framework-specific issues the model caught are worth naming: a ruff B008 violation on Depends() defaults, which I resolved by refactoring to Annotated dependency aliases, and a Decimal JSON serialization failure affecting 422 validation responses, which I fixed using jsonable_encoder in the error response helper.
