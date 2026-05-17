@@ -2,7 +2,7 @@ import logging
 import uuid
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -114,6 +114,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             400: "BAD_REQUEST",
             401: "UNAUTHORIZED",
             403: "FORBIDDEN",
+            503: "SERVICE_UNAVAILABLE",
         }
         code = code_map.get(exc.status_code, "HTTP_ERROR")
         message = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
@@ -137,7 +138,10 @@ def register_routers(app: FastAPI) -> None:
 
     @app.get("/ready", tags=["health"])
     async def ready(db: DbSession) -> dict[str, str]:
-        await db.execute(text("SELECT 1"))
+        try:
+            await db.execute(text("SELECT 1"))
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="database not reachable") from exc
         return {"status": "ready"}
 
     app.include_router(funds_router)
