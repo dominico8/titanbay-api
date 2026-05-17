@@ -38,7 +38,7 @@ Locally (without Docker), the same command works after `uv sync`.
 
 ## API reference
 
-The full spec lives at `/docs` (Swagger UI) and `/redoc`. Endpoints match the provided specification exactly:
+The full spec lives at `/docs` (Swagger UI) and `/redoc`. Endpoints implement the provided specification in path, method, and field semantics. See *Design decisions* below for the rationale on money serialization (Decimal as JSON string rather than number).
 
 ```
 GET    /funds

@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import NotFoundError
@@ -45,6 +46,10 @@ class InvestmentRepository:
             investment_date=data.investment_date,
         )
         self.session.add(investment)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise NotFoundError("Fund or investor not found") from exc
         await self.session.refresh(investment)
         return investment

@@ -16,11 +16,3 @@ class ConflictError(DomainError):
 
 class ValidationError(DomainError):
     status_code = 422
-
-
-class UnauthorizedError(DomainError):
-    status_code = 401
-
-
-class ForbiddenError(DomainError):
-    status_code = 403

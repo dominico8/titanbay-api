@@ -1,0 +1,36 @@
+# Version control
+.git
+.gitignore
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Virtual environments
+.venv
+venv
+env
+
+# Secrets / local config (allow the example through)
+.env
+.env.*
+!.env.example
+
+# Tests + docs are not needed at runtime
+tests
+.github
+*.md
+!README.md
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db

@@ -60,6 +60,39 @@ async def test_create_investment_unknown_fund_returns_404(client: AsyncClient) -
     assert "fund" in body["error"]["message"].lower()
 
 
+async def test_create_investment_precheck_identifies_missing_entity(
+    client: AsyncClient,
+) -> None:
+    """The pre-check path must produce precise messages naming WHICH entity is
+    missing (fund vs investor), not the generic IntegrityError fallback."""
+    investor = await _create_investor(client)
+    fund = await _create_fund(client)
+
+    # Unknown fund + real investor → message names the fund
+    r1 = await client.post(
+        f"/funds/{UNKNOWN_UUID}/investments",
+        json={
+            "investor_id": investor["id"],
+            "amount_usd": "1.00",
+            "investment_date": "2024-01-01",
+        },
+    )
+    assert r1.status_code == 404
+    assert r1.json()["error"]["message"].startswith("Fund ")
+
+    # Real fund + unknown investor → message names the investor
+    r2 = await client.post(
+        f"/funds/{fund['id']}/investments",
+        json={
+            "investor_id": UNKNOWN_UUID,
+            "amount_usd": "1.00",
+            "investment_date": "2024-01-01",
+        },
+    )
+    assert r2.status_code == 404
+    assert r2.json()["error"]["message"].startswith("Investor ")
+
+
 async def test_create_investment_unknown_investor_returns_404(client: AsyncClient) -> None:
     fund = await _create_fund(client)
     response = await client.post(
