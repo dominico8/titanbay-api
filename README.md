@@ -14,6 +14,8 @@ docker compose exec api uv run python -m scripts.seed
 
 Then open http://localhost:8000/docs for the interactive Swagger UI. A health probe is at http://localhost:8000/health.
 
+`GET /health` is a shallow liveness check (process running). `GET /ready` additionally confirms the database is reachable.
+
 ## Local development (without Docker)
 
 Prereqs: Python 3.12, [uv](https://docs.astral.sh/uv/), and a running PostgreSQL 16 with a `titanbay` database. Set `DATABASE_URL` in `.env`, then:
@@ -32,13 +34,13 @@ uv run python -m scripts.seed
 docker compose exec api uv run pytest -v
 ```
 
-32 integration tests cover all 8 endpoints, validation rules, error envelopes, and the request-ID middleware. They finish in ~1 second against a separate `titanbay_test` database, each test isolated by a SAVEPOINT that is rolled back on teardown — the real Alembic migration is exercised on every run, not a `metadata.create_all` shortcut.
+Integration tests cover all 8 endpoints, validation rules, error envelopes, name normalization, the request-ID middleware, and HTTP-level error envelopes for unknown routes and methods. They finish in ~1 second against a separate `titanbay_test` database, each test isolated by a SAVEPOINT that is rolled back on teardown — the real Alembic migration is exercised on every run, not a `metadata.create_all` shortcut.
 
 Locally (without Docker), the same command works after `uv sync`.
 
 ## API reference
 
-The full spec lives at `/docs` (Swagger UI) and `/redoc`. Endpoints implement the provided specification in path, method, and field semantics. See *Design decisions* below for the rationale on money serialization (Decimal as JSON string rather than number).
+The full spec lives at `/docs` (Swagger UI) and `/redoc`. Endpoints match the provided specification exactly.
 
 ```
 GET    /funds
@@ -88,7 +90,7 @@ scripts/seed.py        Idempotent seed data
 
 **FastAPI + async SQLAlchemy 2.0.** Pydantic v2 gives validation and OpenAPI generation for free, and end-to-end async matches a Postgres backend that benefits from connection-level concurrency. SQLAlchemy 2.0's `Mapped` / `mapped_column` style produces cleaner types than the legacy `Column` declarative and integrates well with type checkers.
 
-**Decimal, not float, for money.** Every currency field is `NUMERIC(20, 2)` in Postgres and `Decimal` in Python, and JSON responses serialize money as strings (`"250000000.00"`) rather than numbers. IEEE 754 quietly rounds `0.1 + 0.2`; financial APIs that care return strings to preserve the exact value across the wire.
+**Decimal, not float, internally.** All money columns are `NUMERIC(20, 2)` in Postgres and `Decimal` in Python, so arithmetic and storage are exact. JSON responses convert to a bare number at the serialization boundary to match the spec example responses. The conversion is the only place precision loss could occur, and it is one-way (response only) — the source of truth remains Decimal.
 
 **Postgres ENUMs, not just Pydantic Literals.** `status` and `investor_type` are enforced as native Postgres enum types in addition to Pydantic `Literal` types. A direct INSERT bypassing the app would still fail on an invalid value. Defence in depth: Pydantic catches it at the request boundary, Postgres catches it again at the storage boundary.
 
@@ -111,10 +113,11 @@ scripts/seed.py        Idempotent seed data
 ## Assumptions
 
 - Investor email is unique (not specified but enforced).
+- Investor emails are normalized to lowercase on write; uniqueness is therefore case-insensitive.
 - `vintage_year` is bounded to `[1900, 2100]`.
 - All amounts (`target_size_usd`, `amount_usd`) must be strictly positive.
 - `investment_date` is not constrained relative to fund lifecycle — the spec is silent and there is no `Fund.created_at`-vs-`investment_date` check.
-- All money fields serialize as JSON strings, not numbers, to preserve `Decimal` precision.
+- Money fields are stored and computed as `Decimal` (NUMERIC(20,2)); JSON responses convert to a bare number at the serialization boundary to match the spec.
 - `PUT /funds` is a full replacement of mutable fields (`name`, `vintage_year`, `target_size_usd`, `status`); `id` and `created_at` are not modified.
 
 ## Working with AI tools

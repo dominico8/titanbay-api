@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
@@ -17,6 +19,7 @@ from app.exceptions import (
     ValidationError,
 )
 from app.routers import funds_router, investments_router, investors_router
+from app.routers.dependencies import DbSession
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +106,19 @@ def register_exception_handlers(app: FastAPI) -> None:
             details={"errors": exc.errors()},
         )
 
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        code_map = {
+            404: "NOT_FOUND",
+            405: "METHOD_NOT_ALLOWED",
+            400: "BAD_REQUEST",
+            401: "UNAUTHORIZED",
+            403: "FORBIDDEN",
+        }
+        code = code_map.get(exc.status_code, "HTTP_ERROR")
+        message = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+        return _error_response(request, exc.status_code, code, message)
+
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         logger.exception("Unhandled exception", exc_info=exc)
@@ -118,6 +134,11 @@ def register_routers(app: FastAPI) -> None:
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/ready", tags=["health"])
+    async def ready(db: DbSession) -> dict[str, str]:
+        await db.execute(text("SELECT 1"))
+        return {"status": "ready"}
 
     app.include_router(funds_router)
     app.include_router(investors_router)

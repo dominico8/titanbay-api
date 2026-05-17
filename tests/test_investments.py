@@ -5,7 +5,7 @@ from httpx import AsyncClient
 VALID_FUND = {
     "name": "Titanbay Growth Fund I",
     "vintage_year": 2024,
-    "target_size_usd": "250000000.00",
+    "target_size_usd": 250000000.00,
     "status": "Fundraising",
 }
 VALID_INVESTOR = {
@@ -31,7 +31,7 @@ async def test_create_investment_happy_path(client: AsyncClient) -> None:
         f"/funds/{fund['id']}/investments",
         json={
             "investor_id": investor["id"],
-            "amount_usd": "50000000.00",
+            "amount_usd": 50000000.00,
             "investment_date": "2024-03-15",
         },
     )
@@ -39,7 +39,7 @@ async def test_create_investment_happy_path(client: AsyncClient) -> None:
     body = response.json()
     assert body["fund_id"] == fund["id"]
     assert body["investor_id"] == investor["id"]
-    assert body["amount_usd"] == "50000000.00"
+    assert body["amount_usd"] == 50000000.00
     assert body["investment_date"] == "2024-03-15"
     assert body["id"]
 
@@ -50,7 +50,7 @@ async def test_create_investment_unknown_fund_returns_404(client: AsyncClient) -
         f"/funds/{UNKNOWN_UUID}/investments",
         json={
             "investor_id": investor["id"],
-            "amount_usd": "1000.00",
+            "amount_usd": 1000.00,
             "investment_date": "2024-03-15",
         },
     )
@@ -73,7 +73,7 @@ async def test_create_investment_precheck_identifies_missing_entity(
         f"/funds/{UNKNOWN_UUID}/investments",
         json={
             "investor_id": investor["id"],
-            "amount_usd": "1.00",
+            "amount_usd": 1.00,
             "investment_date": "2024-01-01",
         },
     )
@@ -85,7 +85,7 @@ async def test_create_investment_precheck_identifies_missing_entity(
         f"/funds/{fund['id']}/investments",
         json={
             "investor_id": UNKNOWN_UUID,
-            "amount_usd": "1.00",
+            "amount_usd": 1.00,
             "investment_date": "2024-01-01",
         },
     )
@@ -99,7 +99,7 @@ async def test_create_investment_unknown_investor_returns_404(client: AsyncClien
         f"/funds/{fund['id']}/investments",
         json={
             "investor_id": UNKNOWN_UUID,
-            "amount_usd": "1000.00",
+            "amount_usd": 1000.00,
             "investment_date": "2024-03-15",
         },
     )
@@ -116,7 +116,7 @@ async def test_create_investment_negative_amount_returns_422(client: AsyncClient
         f"/funds/{fund['id']}/investments",
         json={
             "investor_id": investor["id"],
-            "amount_usd": "-100.00",
+            "amount_usd": -100.00,
             "investment_date": "2024-03-15",
         },
     )
@@ -131,7 +131,7 @@ async def test_create_investment_zero_amount_returns_422(client: AsyncClient) ->
         f"/funds/{fund['id']}/investments",
         json={
             "investor_id": investor["id"],
-            "amount_usd": "0.00",
+            "amount_usd": 0.00,
             "investment_date": "2024-03-15",
         },
     )
@@ -148,7 +148,7 @@ async def test_list_investments_filters_by_fund(client: AsyncClient) -> None:
         f"/funds/{fund_a['id']}/investments",
         json={
             "investor_id": investor["id"],
-            "amount_usd": "100.00",
+            "amount_usd": 100.00,
             "investment_date": "2024-01-01",
         },
     )
@@ -156,7 +156,7 @@ async def test_list_investments_filters_by_fund(client: AsyncClient) -> None:
         f"/funds/{fund_b['id']}/investments",
         json={
             "investor_id": investor["id"],
-            "amount_usd": "200.00",
+            "amount_usd": 200.00,
             "investment_date": "2024-02-01",
         },
     )
@@ -166,7 +166,7 @@ async def test_list_investments_filters_by_fund(client: AsyncClient) -> None:
     body = response.json()
     assert len(body) == 1
     assert body[0]["fund_id"] == fund_a["id"]
-    assert body[0]["amount_usd"] == "100.00"
+    assert body[0]["amount_usd"] == 100.00
 
 
 async def test_list_investments_unknown_fund_returns_404(client: AsyncClient) -> None:

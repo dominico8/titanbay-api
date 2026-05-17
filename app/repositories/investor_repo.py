@@ -29,7 +29,7 @@ class InvestorRepository:
         investor = Investor(
             name=data.name,
             investor_type=data.investor_type,
-            email=str(data.email),
+            email=str(data.email).lower(),
         )
         self.session.add(investor)
         try:

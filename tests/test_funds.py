@@ -7,7 +7,7 @@ from httpx import AsyncClient
 VALID_FUND = {
     "name": "Titanbay Growth Fund I",
     "vintage_year": 2024,
-    "target_size_usd": "250000000.00",
+    "target_size_usd": 250000000.00,
     "status": "Fundraising",
 }
 
@@ -25,7 +25,7 @@ async def test_create_fund_returns_201_with_generated_fields(client: AsyncClient
 
 
 async def test_create_fund_negative_target_size_returns_422(client: AsyncClient) -> None:
-    response = await client.post("/funds", json={**VALID_FUND, "target_size_usd": "-1.00"})
+    response = await client.post("/funds", json={**VALID_FUND, "target_size_usd": -1.00})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
@@ -52,6 +52,18 @@ async def test_create_fund_empty_name_returns_422(client: AsyncClient) -> None:
     response = await client.post("/funds", json={**VALID_FUND, "name": ""})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_create_fund_whitespace_only_name_returns_422(client: AsyncClient) -> None:
+    response = await client.post("/funds", json={**VALID_FUND, "name": "   "})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_create_fund_strips_name_whitespace(client: AsyncClient) -> None:
+    response = await client.post("/funds", json={**VALID_FUND, "name": "  Trimmed Fund  "})
+    assert response.status_code == 201
+    assert response.json()["name"] == "Trimmed Fund"
 
 
 async def test_create_fund_missing_field_returns_422(client: AsyncClient) -> None:
@@ -105,7 +117,7 @@ async def test_put_fund_updates_fields_and_returns_200(client: AsyncClient) -> N
         "id": created["id"],
         "name": "Renamed Fund",
         "vintage_year": 2025,
-        "target_size_usd": "300000000.00",
+        "target_size_usd": 300000000.00,
         "status": "Investing",
     }
     response = await client.put("/funds", json=update_body)
@@ -114,7 +126,7 @@ async def test_put_fund_updates_fields_and_returns_200(client: AsyncClient) -> N
     assert body["id"] == created["id"]
     assert body["name"] == "Renamed Fund"
     assert body["vintage_year"] == 2025
-    assert body["target_size_usd"] == "300000000.00"
+    assert body["target_size_usd"] == 300000000.00
     assert body["status"] == "Investing"
 
     # Persisted
@@ -130,7 +142,7 @@ async def test_put_fund_with_unknown_id_returns_404(client: AsyncClient) -> None
             "id": "00000000-0000-0000-0000-000000000000",
             "name": "Phantom",
             "vintage_year": 2024,
-            "target_size_usd": "1000000.00",
+            "target_size_usd": 1000000.00,
             "status": "Fundraising",
         },
     )

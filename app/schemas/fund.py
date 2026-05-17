@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 FundStatus = Literal["Fundraising", "Investing", "Closed"]
 
@@ -16,6 +16,14 @@ class FundCreate(BaseModel):
     target_size_usd: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
     status: FundStatus
 
+    @field_validator("name")
+    @classmethod
+    def _name_must_not_be_blank(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("name must not be empty or whitespace-only")
+        return stripped
+
 
 class FundUpdate(BaseModel):
     id: UUID
@@ -23,6 +31,14 @@ class FundUpdate(BaseModel):
     vintage_year: int = Field(ge=1900, le=2100)
     target_size_usd: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
     status: FundStatus
+
+    @field_validator("name")
+    @classmethod
+    def _name_must_not_be_blank(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("name must not be empty or whitespace-only")
+        return stripped
 
 
 class FundRead(BaseModel):
@@ -34,3 +50,7 @@ class FundRead(BaseModel):
     target_size_usd: Decimal
     status: FundStatus
     created_at: datetime
+
+    @field_serializer("target_size_usd")
+    def _serialize_target_size(self, v: Decimal) -> float:
+        return float(v)

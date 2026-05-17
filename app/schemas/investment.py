@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
 class InvestmentCreate(BaseModel):
@@ -21,3 +21,7 @@ class InvestmentRead(BaseModel):
     fund_id: UUID
     amount_usd: Decimal
     investment_date: date
+
+    @field_serializer("amount_usd")
+    def _serialize_amount(self, v: Decimal) -> float:
+        return float(v)

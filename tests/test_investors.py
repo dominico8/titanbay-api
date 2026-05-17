@@ -55,6 +55,30 @@ async def test_create_investor_empty_name_returns_422(client: AsyncClient) -> No
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
+async def test_create_investor_whitespace_only_name_returns_422(client: AsyncClient) -> None:
+    response = await client.post("/investors", json={**VALID_INVESTOR, "name": "   "})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_create_investor_strips_name_whitespace(client: AsyncClient) -> None:
+    response = await client.post(
+        "/investors",
+        json={**VALID_INVESTOR, "name": "  Trimmed Investor  ", "email": "trim@example.com"},
+    )
+    assert response.status_code == 201
+    assert response.json()["name"] == "Trimmed Investor"
+
+
+async def test_create_investor_email_case_insensitive_uniqueness(client: AsyncClient) -> None:
+    first = {"name": "First", "investor_type": "Institution", "email": "test@example.com"}
+    second = {"name": "Second", "investor_type": "Institution", "email": "TEST@example.com"}
+    assert (await client.post("/investors", json=first)).status_code == 201
+    response = await client.post("/investors", json=second)
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CONFLICT"
+
+
 async def test_list_investors(client: AsyncClient) -> None:
     a = (
         await client.post(

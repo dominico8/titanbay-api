@@ -28,3 +28,19 @@ async def test_request_id_in_error_envelope(client: AsyncClient) -> None:
     assert response.headers["X-Request-ID"] == "trace-abc"
     body = response.json()
     assert body["error"]["request_id"] == "trace-abc"
+
+
+async def test_unknown_route_returns_envelope(client: AsyncClient) -> None:
+    response = await client.get("/does-not-exist")
+    assert response.status_code == 404
+    body = response.json()
+    assert body["error"]["code"] == "NOT_FOUND"
+    assert "request_id" in body["error"]
+
+
+async def test_wrong_method_returns_envelope(client: AsyncClient) -> None:
+    response = await client.delete("/funds")
+    assert response.status_code == 405
+    body = response.json()
+    assert body["error"]["code"] == "METHOD_NOT_ALLOWED"
+    assert "request_id" in body["error"]
